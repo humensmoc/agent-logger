@@ -1,4 +1,4 @@
-# Conversation Topic Logger
+# Agent Logger
 
 给 Codex、Claude Code 或 Cursor 项目添加逐回合 AI 对话日志。日志按本机日期保存在你指定的目录中；用户消息默认逐字记录，AI 回复以简短摘要记录。Skill 只在 Agent 会话中执行，不是后台录屏或定时任务。
 
@@ -9,7 +9,7 @@
 把本仓库的链接和下面这段话一起发给目标项目中的 Agent。安装过程应先问清楚选择，再写入本机和项目文件。
 
 ```text
-请阅读这个仓库的 README.md 和 skills/conversation-topic-logger/SKILL.md，
+请阅读这个仓库的 README.md 和 skills/agent-logger/SKILL.md，
 在当前 Git 项目启用对话日志：<在这里粘贴仓库链接>。123
 
 动手前请依次问我：
@@ -34,18 +34,18 @@ Windows PowerShell：
 
 ```powershell
 git clone <仓库链接> C:\Tools\agent-logger
-python C:\Tools\agent-logger\skills\conversation-topic-logger\scripts\logger_setup.py configure --path C:\Private\conversation-logs --create --exclude-fields ""
-python C:\Tools\agent-logger\skills\conversation-topic-logger\scripts\logger_setup.py install --repo C:\Projects\example --visibility local --log-visibility local
-python C:\Tools\agent-logger\skills\conversation-topic-logger\scripts\logger_setup.py resolve
+python C:\Tools\agent-logger\skills\agent-logger\scripts\logger_setup.py configure --path C:\Private\conversation-logs --create --exclude-fields ""
+python C:\Tools\agent-logger\skills\agent-logger\scripts\logger_setup.py install --repo C:\Projects\example --visibility local --log-visibility local
+python C:\Tools\agent-logger\skills\agent-logger\scripts\logger_setup.py resolve
 ```
 
 macOS：
 
 ```sh
 git clone <仓库链接> ~/Tools/agent-logger
-python3 ~/Tools/agent-logger/skills/conversation-topic-logger/scripts/logger_setup.py configure --path ~/Documents/conversation-logs --create --exclude-fields ""
-python3 ~/Tools/agent-logger/skills/conversation-topic-logger/scripts/logger_setup.py install --repo ~/Projects/example --visibility local --log-visibility local
-python3 ~/Tools/agent-logger/skills/conversation-topic-logger/scripts/logger_setup.py resolve
+python3 ~/Tools/agent-logger/skills/agent-logger/scripts/logger_setup.py configure --path ~/Documents/conversation-logs --create --exclude-fields ""
+python3 ~/Tools/agent-logger/skills/agent-logger/scripts/logger_setup.py install --repo ~/Projects/example --visibility local --log-visibility local
+python3 ~/Tools/agent-logger/skills/agent-logger/scripts/logger_setup.py resolve
 ```
 
 `--create` 仅在你决定创建这个目录时使用；目录已存在可去掉。`--exclude-fields ""` 表示记录全部默认字段。例如不记录设备名和模型：`--exclude-fields device,model`。省略这个参数会保留本机此前的字段选择。
@@ -87,16 +87,16 @@ python3 ~/Tools/agent-logger/skills/conversation-topic-logger/scripts/logger_set
 - **用户**：
   > 请帮我检查 README
 - **回复**：检查了 README 并指出安装步骤中缺少目录配置。
-- **Skill**：conversation-topic-logger
+- **Skill**：agent-logger
 - **环境**：AI=Codex | 模型=未知模型
 ---
 ```
 
 ## 脚本与项目文件
 
-`logger_setup.py` 有四个命令：`configure` 把目录和排除字段保存在本机的 `~/.conversation-topic-logger/config.json`；`resolve` 验证当前设备的配置和目录可写性；`install` 在目标 Git 仓库复制 Skill 并写入项目规则；可选的 `register` 把 Skill 复制到当前用户的 Codex、Claude Code 和 Cursor Skill 目录，便于在其他项目中再次安装。`register` 本身不会让所有项目自动写日志。
+`logger_setup.py` 有四个命令：`configure` 把目录和排除字段保存在本机的 `~/.agent-logger/config.json`；`resolve` 验证当前设备的配置和目录可写性；`install` 在目标 Git 仓库复制 Skill 并写入项目规则；可选的 `register` 把 Skill 复制到当前用户的 Codex、Claude Code 和 Cursor Skill 目录，便于在其他项目中再次安装。`register` 本身不会让所有项目自动写日志。
 
-安装时使用 `AGENTS.override.md` 让 Codex 每轮读取 Skill，`CLAUDE.local.md` 让 Claude Code 每轮读取 Skill，`.cursor/rules/conversation-topic-logger.mdc` 用于 Cursor。使用本地模式的原因是：个人日志习惯与目录通常不应自动施加给协作者；如果团队希望统一启用，可以选择共享并审阅后提交这些文件。[Codex Skill 位置说明](https://learn.chatgpt.com/docs/build-skills)、[Claude Code 项目记忆说明](https://code.claude.com/docs/en/memory)。
+安装时使用 `AGENTS.override.md` 让 Codex 每轮读取 Skill，`CLAUDE.local.md` 让 Claude Code 每轮读取 Skill，`.cursor/rules/agent-logger.mdc` 用于 Cursor。使用本地模式的原因是：个人日志习惯与目录通常不应自动施加给协作者；如果团队希望统一启用，可以选择共享并审阅后提交这些文件。[Codex Skill 位置说明](https://learn.chatgpt.com/docs/build-skills)、[Claude Code 项目记忆说明](https://code.claude.com/docs/en/memory)。
 
 `CONVERSATION_LOG_ROOT` 环境变量优先于本机配置。`CONVERSATION_LOG_CONFIG_FILE` 可指定另一个本机配置文件。换设备时需要在新设备重新运行 `configure`；旧日志不会自动迁移。多设备写同一个云同步目录可能发生冲突，本机锁不保证跨设备串行。
 

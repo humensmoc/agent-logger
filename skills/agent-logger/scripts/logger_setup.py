@@ -17,36 +17,36 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
     sys.stderr.reconfigure(encoding="utf-8")
 
-SKILL_NAME = "conversation-topic-logger"
+SKILL_NAME = "agent-logger"
 SKILL_DIR = Path(__file__).resolve().parent.parent
-DEFAULT_CONFIG = Path.home() / ".conversation-topic-logger" / "config.json"
+DEFAULT_CONFIG = Path.home() / ".agent-logger" / "config.json"
 OPTIONAL_FIELDS = (
     "user", "image_description", "reply", "device", "project", "source",
     "timezone", "files", "skills", "ai", "model",
 )
 PACKAGE_FILES = ("SKILL.md", "scripts/logger_setup.py")
-AGENTS_BLOCK = """<!-- conversation-topic-logger:begin -->
+AGENTS_BLOCK = """<!-- agent-logger:begin -->
 ## Conversation log
 
-Before every final response, read and follow `.agents/skills/conversation-topic-logger/SKILL.md`.
+Before every final response, read and follow `.agents/skills/agent-logger/SKILL.md`.
 If the log cannot be written, say why in the final response.
-<!-- conversation-topic-logger:end -->"""
-CLAUDE_BLOCK = """<!-- conversation-topic-logger:begin -->
-Before every final response, read and follow `.agents/skills/conversation-topic-logger/SKILL.md`.
+<!-- agent-logger:end -->"""
+CLAUDE_BLOCK = """<!-- agent-logger:begin -->
+Before every final response, read and follow `.agents/skills/agent-logger/SKILL.md`.
 If the log cannot be written, say why in the final response.
-<!-- conversation-topic-logger:end -->"""
+<!-- agent-logger:end -->"""
 CURSOR_RULE = """---
-description: Record every user turn with conversation-topic-logger
+description: Record every user turn with agent-logger
 alwaysApply: true
 ---
 
-Before every final response, read and follow `.agents/skills/conversation-topic-logger/SKILL.md`.
+Before every final response, read and follow `.agents/skills/agent-logger/SKILL.md`.
 If the log cannot be written, say why in the final response.
 """
 LOCAL_PATHS = (
     "/AGENTS.override.md", "/CLAUDE.local.md",
-    "/.agents/skills/conversation-topic-logger/",
-    "/.cursor/rules/conversation-topic-logger.mdc",
+    "/.agents/skills/agent-logger/",
+    "/.cursor/rules/agent-logger.mdc",
 )
 
 
@@ -192,8 +192,8 @@ def copied_skill(target, update):
 
 def merge_block(path, block):
     content = path.read_text(encoding="utf-8-sig") if path.exists() else ""
-    start = "<!-- conversation-topic-logger:begin -->"
-    end = "<!-- conversation-topic-logger:end -->"
+    start = "<!-- agent-logger:begin -->"
+    end = "<!-- agent-logger:end -->"
     if start in content or end in content:
         if content.count(start) != 1 or content.count(end) != 1:
             raise ValueError(f"项目规则标记不完整：{path}")
@@ -210,8 +210,8 @@ def validate_block(path):
     if not path.exists():
         return
     content = path.read_text(encoding="utf-8-sig")
-    start = "<!-- conversation-topic-logger:begin -->"
-    end = "<!-- conversation-topic-logger:end -->"
+    start = "<!-- agent-logger:begin -->"
+    end = "<!-- agent-logger:end -->"
     if (content.count(start) != content.count(end)
             or content.count(start) > 1
             or (start in content and content.index(end) < content.index(start))):
@@ -220,8 +220,8 @@ def validate_block(path):
 
 def set_local_exclude(common_dir, rules_local, logs_local, log_root, repository):
     path = common_dir / "info" / "exclude"
-    start = "# conversation-topic-logger:begin"
-    end = "# conversation-topic-logger:end"
+    start = "# agent-logger:begin"
+    end = "# agent-logger:end"
     content = path.read_text(encoding="utf-8") if path.exists() else ""
     if start in content or end in content:
         if content.count(start) != 1 or content.count(end) != 1:
@@ -259,13 +259,13 @@ def install(repo, visibility, log_visibility, update=False):
     repository, common_dir = git_repository(Path(repo).expanduser().resolve(strict=True))
     paths = (
         "AGENTS.override.md", "CLAUDE.local.md",
-        ".agents/skills/conversation-topic-logger",
-        ".cursor/rules/conversation-topic-logger.mdc",
+        ".agents/skills/agent-logger",
+        ".cursor/rules/agent-logger.mdc",
     )
     tracked = tracked_paths(repository, paths) if visibility == "local" else []
     if visibility == "local":
         agents_file = repository / "AGENTS.md"
-        if agents_file.is_file() and "conversation-topic-logger" in agents_file.read_text(encoding="utf-8-sig"):
+        if agents_file.is_file() and "agent-logger" in agents_file.read_text(encoding="utf-8-sig"):
             if tracked_paths(repository, ("AGENTS.md",)):
                 tracked.append("AGENTS.md（含对话日志规则）")
     if log_visibility == "local":

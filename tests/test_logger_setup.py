@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import patch
 
 
-SCRIPT = Path(__file__).resolve().parents[1] / "skills" / "conversation-topic-logger" / "scripts" / "logger_setup.py"
+SCRIPT = Path(__file__).resolve().parents[1] / "skills" / "agent-logger" / "scripts" / "logger_setup.py"
 spec = importlib.util.spec_from_file_location("logger_setup", SCRIPT)
 logger_setup = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(logger_setup)
@@ -50,10 +50,10 @@ class LoggerSetupTests(unittest.TestCase):
         self.assertEqual(first["repository"], second["repository"])
         self.assertTrue((self.repo / "AGENTS.override.md").is_file())
         self.assertTrue((self.repo / "CLAUDE.local.md").is_file())
-        self.assertTrue((self.repo / ".agents/skills/conversation-topic-logger/SKILL.md").is_file())
+        self.assertTrue((self.repo / ".agents/skills/agent-logger/SKILL.md").is_file())
         self.assertEqual(
             (self.repo / "AGENTS.override.md").read_text(encoding="utf-8").count(
-                "<!-- conversation-topic-logger:begin -->"
+                "<!-- agent-logger:begin -->"
             ), 1,
         )
         ignored = subprocess.run(
@@ -80,7 +80,7 @@ class LoggerSetupTests(unittest.TestCase):
     def test_tracked_agents_rule_blocks_local_install(self):
         logger_setup.configure(str(self.log_root), excluded_fields=[])
         (self.repo / "AGENTS.md").write_text(
-            "Every turn must run conversation-topic-logger.\n", encoding="utf-8"
+            "Every turn must run agent-logger.\n", encoding="utf-8"
         )
         subprocess.run(["git", "-C", str(self.repo), "add", "AGENTS.md"], check=True)
         with self.assertRaisesRegex(ValueError, r"AGENTS\.md（含对话日志规则）"):

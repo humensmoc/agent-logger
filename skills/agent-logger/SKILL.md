@@ -1,5 +1,5 @@
 ---
-name: conversation-topic-logger
+name: agent-logger
 description: 为已启用的项目逐回合记录 AI 对话；用户要求安装对话日志时配置本机目录、记录字段与项目规则。
 ---
 
@@ -59,7 +59,7 @@ description: 为已启用的项目逐回合记录 AI 对话；用户要求安装
 - **回复**：本轮实际完成事项。
 - **文件**：
   - 修改 `path/to/file`：改动概要
-- **Skill**：conversation-topic-logger
+- **Skill**：agent-logger
 - **环境**：AI=Codex | 模型=未知模型
 ---
 ```
@@ -88,7 +88,7 @@ description: 为已启用的项目逐回合记录 AI 对话；用户要求安装
 
 ## 串行写入与边界
 
-- 在日志根目录打开 `.conversation-topic-logger.lock`，使用 `OpenOrCreate`、`ReadWrite` 和 `FileShare.None`。持有句柄时重读日文件、计算下一个回合号、追加并回读验证，最后在 `finally` 中释放句柄。锁占用最多短暂重试 3 次；访问拒绝立即报告。锁文件可保留。
+- 在日志根目录打开 `.agent-logger.lock`，使用 `OpenOrCreate`、`ReadWrite` 和 `FileShare.None`。持有句柄时重读日文件、计算下一个回合号、追加并回读验证，最后在 `finally` 中释放句柄。锁占用最多短暂重试 3 次；访问拒绝立即报告。锁文件可保留。
 - 同一日志目录的所有写入者须遵循这一锁协议。云同步设备间没有可靠的共享锁，可能产生冲突。
 - 配置路径不会赋予文件系统权限；遇到权限或沙箱阻止时说明实际路径与错误，不擅自改目录或放宽权限。
 - 即使日志目录存在，也要按当前会话的实际权限验证。受限环境可能需要用户将日志目录加入允许写入范围；Skill 不能自行扩大沙箱权限。若当前环境支持审批，遵循该机制。路径或权限问题只阻止日志步骤，不能无限重试或阻止原任务回复。
