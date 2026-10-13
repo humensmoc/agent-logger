@@ -24,7 +24,7 @@
 请不要修改现有日志、已跟踪文件或仓库历史。
 ```
 
-仅发送链接无法让一个尚未读取仓库内容的 Agent 自动配置本机路径。上述提示词明确了它需要先做的事，也适用于换新设备：新设备没有本机配置时会重新询问日志目录。
+仅发送链接无法让一个尚未读取仓库内容的 Agent 自动配置本机路径。上述提示词明确了它需要先做的事，也适用于换新设备：当前 Skill 的 `routes.json` 没有新设备的路径时会重新询问日志目录。
 
 ## 手动安装
 
@@ -36,7 +36,7 @@ Windows PowerShell：
 git clone <仓库链接> C:\Tools\agent-logger
 python C:\Tools\agent-logger\skills\agent-logger\scripts\logger_setup.py configure --path C:\Private\conversation-logs --create --exclude-fields ""
 python C:\Tools\agent-logger\skills\agent-logger\scripts\logger_setup.py install --repo C:\Projects\example --visibility local --log-visibility local
-python C:\Tools\agent-logger\skills\agent-logger\scripts\logger_setup.py resolve
+python C:\Projects\example\.agents\skills\agent-logger\scripts\logger_setup.py resolve
 ```
 
 macOS：
@@ -45,10 +45,10 @@ macOS：
 git clone <仓库链接> ~/Tools/agent-logger
 python3 ~/Tools/agent-logger/skills/agent-logger/scripts/logger_setup.py configure --path ~/Documents/conversation-logs --create --exclude-fields ""
 python3 ~/Tools/agent-logger/skills/agent-logger/scripts/logger_setup.py install --repo ~/Projects/example --visibility local --log-visibility local
-python3 ~/Tools/agent-logger/skills/agent-logger/scripts/logger_setup.py resolve
+python3 ~/Projects/example/.agents/skills/agent-logger/scripts/logger_setup.py resolve
 ```
 
-`--create` 仅在你决定创建这个目录时使用；目录已存在可去掉。`--exclude-fields ""` 表示记录全部默认字段。例如不记录设备名和模型：`--exclude-fields device,model`。省略这个参数会保留本机此前的字段选择。
+`--create` 仅在你决定创建这个目录时使用；目录已存在可去掉。`--exclude-fields ""` 表示记录全部默认字段。例如不记录设备名和模型：`--exclude-fields device,model`。省略这个参数会保留当前 Skill 的 `routes.json` 中该设备此前的字段选择。
 
 `install` 明确指定 `--repo`，避免误把发布仓库当作目标项目。默认示例中的两个 `local` 是**示例选择**，实际使用前请决定：
 
@@ -94,17 +94,18 @@ python3 ~/Tools/agent-logger/skills/agent-logger/scripts/logger_setup.py resolve
 
 ## 脚本与项目文件
 
-`logger_setup.py` 有四个命令：`configure` 把目录和排除字段保存在本机的 `~/.agent-logger/config.json`；`resolve` 验证当前设备的配置和目录可写性；`install` 在目标 Git 仓库复制 Skill 并写入项目规则；可选的 `register` 把 Skill 复制到当前用户的 Codex、Claude Code 和 Cursor Skill 目录，便于在其他项目中再次安装。`register` 本身不会让所有项目自动写日志。
+`logger_setup.py` 有四个命令：`configure` 把当前设备的日志目录和排除字段写入 Skill 旁的 `routes.json`；`resolve` 验证该路径可写；`install` 在目标 Git 仓库复制 Skill、本机路由并写入项目规则；可选的 `register` 把 Skill 和本机路由复制到当前用户的 Codex、Claude Code 和 Cursor Skill 目录，便于在其他项目中再次安装。`register` 本身不会让所有项目自动写日志。
 
 安装时使用 `AGENTS.override.md` 让 Codex 每轮读取 Skill，`CLAUDE.local.md` 让 Claude Code 每轮读取 Skill，`.cursor/rules/agent-logger.mdc` 用于 Cursor。使用本地模式的原因是：个人日志习惯与目录通常不应自动施加给协作者；如果团队希望统一启用，可以选择共享并审阅后提交这些文件。[Codex Skill 位置说明](https://learn.chatgpt.com/docs/build-skills)、[Claude Code 项目记忆说明](https://code.claude.com/docs/en/memory)。
 
-`CONVERSATION_LOG_ROOT` 环境变量优先于本机配置。`CONVERSATION_LOG_CONFIG_FILE` 可指定另一个本机配置文件。换设备时需要在新设备重新运行 `configure`；旧日志不会自动迁移。多设备写同一个云同步目录可能发生冲突，本机锁不保证跨设备串行。
+换设备时，当前 Skill 副本的 `routes.json` 若没有该设备的路径，先询问用户使用哪个日志根目录，再运行 `configure --path <绝对路径>`。旧日志不会自动迁移。多设备写同一个云同步目录可能发生冲突，本机锁不保证跨设备串行。
+
+`routes.json` 是唯一配置来源，按设备名保存路径和排除字段，格式见 `skills/agent-logger/routes.example.json`。真实路由不随发布仓库提交；`install` 和 `register` 会为各自的 Skill 副本写入当前设备路由，已有的目标路由保留。安装到仓库时，真实路由始终加入该仓库的本地 Git exclude。
 
 ## 故障排查与更新
 
-- `resolve` 提示没有配置：在这台设备运行 `configure --path <绝对路径>`。
+- `resolve` 提示当前设备没有路径：询问用户要使用的绝对路径，再运行 `configure --path <绝对路径>`。
 - 目录不存在或不可写：确认路径、权限；只有你要创建新目录时才加 `--create`。
-- 环境变量指向失效路径：修正或清除 `CONVERSATION_LOG_ROOT`，它不会自动回退到配置文件。
 - 旧版 Skill 与发布包不同：先查看差异，确认后在 `install` 增加 `--update`。
 - Git 已跟踪日志或本地规则：先检查 Git 索引和公开历史；添加 ignore 无法撤回已发布内容。
 

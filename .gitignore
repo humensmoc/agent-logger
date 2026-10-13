@@ -3,3 +3,4 @@
 .agent-logger/
 logs/
 *.log
+skills/agent-logger/routes.json

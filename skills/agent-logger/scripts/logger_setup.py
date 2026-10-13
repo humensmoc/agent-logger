@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Configure a local conversation log and enable the skill in a Git repository."""
+"""Configure Skill-local conversation log routes and enable the skill in a Git repository."""
 
 import argparse
 import json
@@ -19,12 +19,12 @@ if hasattr(sys.stdout, "reconfigure"):
 
 SKILL_NAME = "agent-logger"
 SKILL_DIR = Path(__file__).resolve().parent.parent
-DEFAULT_CONFIG = Path.home() / ".agent-logger" / "config.json"
+ROUTES_FILE = SKILL_DIR / "routes.json"
 OPTIONAL_FIELDS = (
     "user", "image_description", "reply", "device", "project", "source",
     "timezone", "files", "skills", "ai", "model",
 )
-PACKAGE_FILES = ("SKILL.md", "scripts/logger_setup.py")
+PACKAGE_FILES = ("SKILL.md", "routes.example.json", "scripts/logger_setup.py")
 AGENTS_BLOCK = """<!-- agent-logger:begin -->
 ## Conversation log
 
@@ -65,11 +65,6 @@ def hostname():
     return name[:-6] if name.endswith(".local") else name
 
 
-def config_file():
-    raw = os.environ.get("CONVERSATION_LOG_CONFIG_FILE")
-    return Path(raw).expanduser() if raw else DEFAULT_CONFIG
-
-
 def read_json(path):
     try:
         with path.open("r", encoding="utf-8") as stream:
@@ -105,21 +100,25 @@ def validate_root(raw):
 
 
 def resolve():
-    location = config_file()
-    config = read_json(location) if location.exists() else {}
-    env_root = os.environ.get("CONVERSATION_LOG_ROOT")
-    source = "environment" if env_root else "device"
-    raw = env_root or config.get("log_root")
+    routes = read_json(ROUTES_FILE) if ROUTES_FILE.exists() else {}
+    mapping = routes.get("log_root_by_host", {})
+    if not isinstance(mapping, dict):
+        raise ValueError(f"{ROUTES_FILE} 的 log_root_by_host 必须是对象")
+    host = hostname()
+    raw = mapping.get(host)
     if not raw:
-        raise ValueError(f"设备 {hostname()} 尚未配置日志目录；运行 configure --path <绝对路径>")
+        raise ValueError(f"设备 {host} 在 {ROUTES_FILE} 中没有日志目录；请询问用户路径")
     try:
         root = validate_root(raw)
     except (OSError, ValueError) as exc:
-        raise ValueError(f"设备 {hostname()} 的日志目录无效（{source}: {raw}）：{exc}") from exc
-    fields = validate_fields(config.get("excluded_fields", []))
+        raise ValueError(f"设备 {host} 的日志目录无效（{ROUTES_FILE}: {raw}）：{exc}") from exc
+    field_mapping = routes.get("excluded_fields_by_host", {})
+    if not isinstance(field_mapping, dict):
+        raise ValueError(f"{ROUTES_FILE} 的 excluded_fields_by_host 必须是对象")
+    fields = validate_fields(field_mapping.get(host, []))
     return {
-        "host": hostname(), "source": source, "log_root": str(root),
-        "excluded_fields": fields, "config_file": str(location),
+        "host": host, "source": "route", "log_root": str(root),
+        "excluded_fields": fields, "routes_file": str(ROUTES_FILE),
     }
 
 
@@ -127,26 +126,30 @@ def configure(path, create=False, excluded_fields=None):
     candidate = Path(path).expanduser()
     if not candidate.is_absolute():
         raise ValueError(f"日志目录必须是绝对路径：{path}")
-    env_root = os.environ.get("CONVERSATION_LOG_ROOT")
-    if env_root and Path(env_root).expanduser().resolve() != candidate.resolve():
-        raise ValueError("CONVERSATION_LOG_ROOT 正在覆盖本机配置；先修正或清除该环境变量")
     if create:
         candidate.mkdir(parents=True, exist_ok=True)
     root = validate_root(str(candidate))
-    location = config_file()
-    current = read_json(location) if location.exists() else {}
-    fields = current.get("excluded_fields", []) if excluded_fields is None else excluded_fields
-    current["log_root"] = str(root)
-    current["excluded_fields"] = validate_fields(fields)
-    location.parent.mkdir(parents=True, exist_ok=True)
+    current = read_json(ROUTES_FILE) if ROUTES_FILE.exists() else {}
+    paths = current.get("log_root_by_host", {})
+    field_mapping = current.get("excluded_fields_by_host", {})
+    if not isinstance(paths, dict) or not isinstance(field_mapping, dict):
+        raise ValueError(f"{ROUTES_FILE} 中的设备映射必须是对象")
+    host = hostname()
+    fields = field_mapping.get(host, []) if excluded_fields is None else excluded_fields
+    paths[host] = str(root)
+    field_mapping[host] = validate_fields(fields)
+    current.pop("prefer_device_route", None)
+    current["log_root_by_host"] = paths
+    current["excluded_fields_by_host"] = field_mapping
+    ROUTES_FILE.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(
-        "w", encoding="utf-8", dir=location.parent, delete=False
+        "w", encoding="utf-8", dir=ROUTES_FILE.parent, delete=False
     ) as stream:
         json.dump(current, stream, ensure_ascii=False, indent=2)
         stream.write("\n")
         temp_name = stream.name
     try:
-        os.replace(temp_name, location)
+        os.replace(temp_name, ROUTES_FILE)
     finally:
         if os.path.exists(temp_name):
             os.unlink(temp_name)
@@ -190,6 +193,28 @@ def copied_skill(target, update):
         shutil.copy2(SKILL_DIR / part, destination)
 
 
+def copy_current_route(target):
+    """Give a new Skill copy this device's route without replacing its own routes."""
+    if target.resolve() == SKILL_DIR.resolve():
+        return
+    source = read_json(ROUTES_FILE)
+    host = hostname()
+    source_paths = source.get("log_root_by_host", {})
+    source_fields = source.get("excluded_fields_by_host", {})
+    destination = target / "routes.json"
+    current = read_json(destination) if destination.exists() else {}
+    paths = current.get("log_root_by_host", {})
+    fields = current.get("excluded_fields_by_host", {})
+    if not all(isinstance(value, dict) for value in (source_paths, source_fields, paths, fields)):
+        raise ValueError("routes.json 中的设备映射必须是对象")
+    if host not in paths:
+        paths[host] = source_paths[host]
+        fields[host] = source_fields.get(host, [])
+        current["log_root_by_host"] = paths
+        current["excluded_fields_by_host"] = fields
+        destination.write_text(json.dumps(current, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
 def merge_block(path, block):
     content = path.read_text(encoding="utf-8-sig") if path.exists() else ""
     start = "<!-- agent-logger:begin -->"
@@ -229,7 +254,7 @@ def set_local_exclude(common_dir, rules_local, logs_local, log_root, repository)
         beginning = content.index(start)
         ending = content.index(end, beginning) + len(end)
         content = content[:beginning] + content[ending:]
-    patterns = list(LOCAL_PATHS) if rules_local else []
+    patterns = list(LOCAL_PATHS) if rules_local else ["/.agents/skills/agent-logger/routes.json"]
     if logs_local:
         try:
             relative = Path(log_root).relative_to(repository)
@@ -257,6 +282,9 @@ def tracked_paths(repository, paths):
 def install(repo, visibility, log_visibility, update=False):
     settings = resolve()
     repository, common_dir = git_repository(Path(repo).expanduser().resolve(strict=True))
+    private_route = ".agents/skills/agent-logger/routes.json"
+    if tracked_paths(repository, (private_route,)):
+        raise ValueError(f"本机路由已被 Git 跟踪，请先检查 Git 索引：{private_route}")
     paths = (
         "AGENTS.override.md", "CLAUDE.local.md",
         ".agents/skills/agent-logger",
@@ -292,6 +320,7 @@ def install(repo, visibility, log_visibility, update=False):
         settings["log_root"], repository
     )
     copied_skill(target, update)
+    copy_current_route(target)
     merge_block(agents, AGENTS_BLOCK)
     merge_block(claude, CLAUDE_BLOCK)
     cursor.parent.mkdir(parents=True, exist_ok=True)
@@ -302,7 +331,7 @@ def install(repo, visibility, log_visibility, update=False):
         "log_visibility": log_visibility,
         "skill": str(target), "agents_override": str(agents),
         "claude_local": str(claude), "cursor_rule": str(cursor),
-        "git_exclude": str(exclude) if visibility == "local" or log_visibility == "local" else None,
+        "git_exclude": str(exclude),
     }
 
 
@@ -314,6 +343,7 @@ def register(update=False):
     )
     for target in destinations:
         copied_skill(target, update)
+        copy_current_route(target)
     return {"registered": [str(path) for path in destinations]}
 
 
@@ -321,7 +351,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("resolve", help="验证本机日志目录及记录字段")
-    configure_parser = commands.add_parser("configure", help="保存当前设备的日志配置")
+    configure_parser = commands.add_parser("configure", help="把当前设备的配置写入 Skill 旁的 routes.json")
     configure_parser.add_argument("--path", required=True, help="日志根目录的绝对路径")
     configure_parser.add_argument("--create", action="store_true", help="按用户要求创建目录")
     configure_parser.add_argument(

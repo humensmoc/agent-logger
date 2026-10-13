@@ -7,6 +7,14 @@ description: 为已启用的项目逐回合记录 AI 对话；用户要求安装
 
 此 Skill 记录 Agent 被触发后的用户回合。安装和启用是两回事：把 Skill 放入用户目录仅提供能力；项目中的 `AGENTS.override.md`、`CLAUDE.local.md` 或 Cursor 规则才要求每轮运行。无会话时不会自行生成日志。
 
+## 本机日志位置
+
+日志写入 `<log_root>/YYYY/MM/YYYY-MM-DD.md`。`<log_root>` 是现有日志文件夹的绝对路径，不再自动拼接“对话日志”。每次写入前运行 `scripts/logger_setup.py resolve`，以输出的 `log_root` 为准，不从仓库路径推测。
+
+只读取**实际使用的 Skill 目录**中的 `routes.json`，按当前设备名读取日志路径和排除字段；结构见 `routes.example.json`。设备名由 `hostname()` 取得，转小写并去掉末尾 `.local`。本发布仓库忽略真实的 `routes.json`，不要把私人路径写入示例文件。安装脚本会把当前设备的路由写入目标 Skill 副本，并在目标仓库的本地 Git exclude 中忽略该文件。
+
+当前设备在 `routes.json` 中没有路径时，询问用户这台设备的日志根目录；用户提供或确认后再运行 `configure` 写入该文件。路径不存在或不可写时报告具体错误并询问用户，不自行选用其他设备的路径。
+
 ## 首次启用或换设备
 
 给用户说明默认记录内容，并逐项询问是否排除。默认保留用户消息原文，包括粘贴的代码、链接和文本；附件用占位符，图片可附简短客观说明。其他默认字段为回复摘要、设备、项目、来源绝对路径、时区、文件改动、所用 Skill、AI 名称及模型。日期、时间和日内回合号是日志结构，无法关闭。可排除字段名见下表。
@@ -25,13 +33,12 @@ description: 为已启用的项目逐回合记录 AI 对话；用户要求安装
 | `ai` | Agent 产品名称 |
 | `model` | 模型 ID |
 
-1. 问用户日志根目录的绝对路径。建议放在公开仓库外；若放在仓库内，单独询问是否要在本地 Git exclude 中忽略。不得自行改用别的目录。新设备没有本机配置时重新询问。
+1. 当前设备在 `routes.json` 中没有路径时，问用户日志根目录的绝对路径。建议放在公开仓库外；若放在仓库内，单独询问是否要在本地 Git exclude 中忽略。不得自行改用别的目录。
 2. 向用户展示上表，问有没有不想记录的字段。不要只根据个人判断关闭原文；按用户回答传给 `--exclude-fields`。
 3. 单独询问用户是否要把 Skill 文件、`AGENTS.override.md`、`CLAUDE.local.md` 和 Cursor 规则留在本地。规则的 `local` 模式将这些路径写入该仓库的 `.git/info/exclude`；`shared` 模式允许主动提交和团队共享。日志目录在目标仓库内时，另用日志的 `local` 或 `shared` 选择控制是否忽略。说明 `.git/info/exclude` 不影响已跟踪文件或其他克隆。不要替用户默认选择。
-4. 用户提供或确认现有目录后，从实际 Skill 目录运行 `python scripts/logger_setup.py configure --path <绝对路径> --exclude-fields <字段列表>`。Mac 可用 `python3`。只有用户明确要求创建目录时才加 `--create`。然后运行 `install --repo <目标仓库路径> --visibility local|shared --log-visibility local|shared`，最后运行 `resolve` 并检查输出。
-5. 若 `CONVERSATION_LOG_ROOT` 环境变量存在，它优先于本机配置。无效时要求用户修正或清除，不能回退到别的路径。
+4. 用户提供或确认现有目录后，从实际 Skill 目录运行 `python scripts/logger_setup.py configure --path <绝对路径> --exclude-fields <字段列表>`。Mac 可用 `python3`。只有用户明确要求创建目录时才加 `--create`。然后运行 `install --repo <目标仓库路径> --visibility local|shared --log-visibility local|shared`，最后运行目标副本的 `resolve` 并检查输出。
 
-安装脚本仅保存当前设备的配置，不会移动旧日志。当前仓库已跟踪日志、生成的规则，或受 Git 跟踪的 `AGENTS.md` 已含日志约束，而用户选择 `local` 时，脚本拒绝宣称它们已被隐藏；需由用户决定如何处理 Git 索引和公开历史。Codex 在同目录优先读取 `AGENTS.override.md`，Cursor 使用本地规则。`.git/info/exclude` 只忽略未跟踪文件。
+安装脚本仅保存当前设备的路由，不会移动旧日志。当前仓库已跟踪日志、生成的规则，或受 Git 跟踪的 `AGENTS.md` 已含日志约束，而用户选择 `local` 时，脚本拒绝宣称它们已被隐藏；需由用户决定如何处理 Git 索引和公开历史。Codex 在同目录优先读取 `AGENTS.override.md`，Cursor 使用本地规则。`.git/info/exclude` 只忽略未跟踪文件。
 
 ## 每轮执行
 
